@@ -11,11 +11,49 @@ Build Flutter desktop apps in Dart and Rust.
 ## Status
 
 This workspace targets the modern Flutter embedder API and is developed against
-Flutter **3.44 – 3.50.x**; the vendored `flutter-engine-sys/flutter-engine.h` is
-Flutter 3.50's `flutter_embedder.h` verbatim, and the test suite is run against
-both 3.50's engine (`371f7720…`) and 3.47.8's (`cf636b1d…`). The
-`examples/multiple_windows` project runs Flutter's official multi-window
-reference app on the GLFW backend.
+Flutter **3.50 – 3.51.x**: 3.50.0 stable (engine `371f7720…`) and
+3.51.0-1.0.pre (engine `f586770e…`, content hash `2f315d36…`). The vendored
+`flutter-engine-sys/flutter-engine.h` is Flutter 3.50's `flutter_embedder.h`
+verbatim; the multi-view APIs it exposes require the Flutter 3.50 framework.
+`examples/multiple_windows` runs Flutter's official multi-window reference app
+on the GLFW backend.
+
+## Multi-window on the official embedder API
+
+Multi-window support is not a private protocol: flutter-rs implements the same
+C embedder API that Flutter's official C++ embedders (GTK, Windows, macOS) use.
+One `FlutterEngine` drives any number of views:
+
+- `FlutterEngineAddView`/`FlutterEngineRemoveView` create and destroy views at
+  runtime; the first window still owns the implicit view `0`, so `runApp` apps
+  work unchanged;
+- each view receives its own `FlutterWindowMetricsEvent`, pointer/scroll events
+  and `FlutterViewFocusEvent`, and the framework's
+  `view_focus_change_request_callback` is honoured;
+- a `FlutterCompositor` supplies one backing store per view
+  (`create_backing_store`/`collect_backing_store`) and presents it through
+  `present_view_callback`; the renderer is OpenGL on Linux/Windows, Metal on
+  macOS (Impeller by default, Skia with `--enable-impeller=false`), with a
+  software fallback;
+- `engine_id` carries a pointer to the windowing function table, mirroring the
+  native engine pointer official embedders expose to Dart.
+
+The framework's own Dart windowing APIs — `WindowController`,
+`DialogWindowController`, `TooltipWindowController`, `PopupWindowController`,
+`SatelliteWindowController` — run unmodified on top: no Flutter SDK patches, no
+exported C symbols, and no private channels. `examples/multiple_windows` is the
+SDK's reference app with only a `main_glfw.dart` wrapper and a Rust runner.
+
+Verified configurations:
+
+| Platform | Renderer | Status |
+| --- | --- | --- |
+| Linux (X11, XWayland) | OpenGL compositor | verified |
+| macOS (Apple Silicon) | Metal + Impeller, Skia, software | verified |
+| Windows 11 VM | OpenGL (Mesa llvmpipe) | exercised, see CHANGELOG |
+
+Native Wayland cannot position top-level windows; run under XWayland for
+tooltips, popups and satellites.
 
 The newest release on crates.io is **0.3.5 (2019)**. Everything here is the
 unreleased 0.5.0 work; see [CHANGELOG.md](CHANGELOG.md).
@@ -45,9 +83,9 @@ is `exclude`d from the workspace.
   flutter-engine-sys / flutter-engine / flutter-plugins / flutter-tools;
   flutter-glfw declares 1.95, because glfw 0.63 uses `cfg_select!`.
 - A [Flutter SDK](https://flutter.dev/) on `PATH` (or `FLUTTER_ROOT` set),
-  3.44 – 3.50.x. The windowing APIs used by `examples/multiple_windows` require
-  Flutter 3.50's framework, but are gated to Flutter's main channel there; the
-  example enables the runtime flag itself (see its README).
+  3.50 – 3.51.x. The windowing APIs used by `examples/multiple_windows` require
+  Flutter 3.50+; they are behind a runtime feature flag, which the example's
+  entrypoint enables itself (see its README).
 - On Linux, the system packages listed under
   [Building and testing](CONTRIBUTING.md#building-and-testing).
 
@@ -178,16 +216,22 @@ FLUTTER_ROOT=/path/to/flutter-3.50 ./run_macos.sh
 ```
 
 The example creates its windows from Dart; the Rust runner only starts the
-engine. The backend uses a compositor with one FBO per view and presents each
-view into its own GLFW window. Window management is best-effort on native
-Wayland (top-level positioning is unavailable); run a Wayland session through
-XWayland (`FLUTTER_GLFW_PLATFORM=x11`) for tooltips, popups and satellites.
+engine. Under the hood this is the embedder C API described above: the Dart
+side drives the framework's own windowing interfaces, and the backend adds one
+engine view per native window through `AddView`/`RemoveView`. The compositor
+keeps one render target per view and presents each into its own GLFW window.
+Window management is best-effort on native Wayland (top-level positioning is
+unavailable); run a Wayland session through XWayland
+(`FLUTTER_GLFW_PLATFORM=x11`) for tooltips, popups and satellites.
 
-Linux is the verified platform. Windows and macOS share the same backend and
-ABI; Windows needs a native build (or a mingw toolchain with the dialog feature
-disabled). macOS was built and run on Apple Silicon: its engine has no OpenGL
-backend. The default there is Metal with Impeller: the engine renders into
-`MTLTexture` backing stores that the compositor blits into each window's
+Linux and macOS are verified end-to-end (see the matrix above); Windows shares
+the same backend and ABI and is exercised in a Win11 VM. Windows needs a native
+build (or a mingw toolchain with the dialog feature disabled), and child windows
+get a Win32 owner (`GWLP_HWNDPARENT`, the equivalent of AppKit's
+`addChildWindow:ordered:` and X11's `WM_TRANSIENT_FOR`) so tooltips, popups,
+dialogs and satellites stay directly above their parent. macOS was built and
+run on Apple Silicon: its engine has no OpenGL backend. The default there is
+Metal with Impeller: the engine renders into `MTLTexture` backing stores that the compositor blits into each window's
 `CAMetalLayer`. `FLUTTER_GLFW_RENDERER=software` forces the CPU renderer, whose
 pixels the compositor uploads through the window's GL context, and passing
 `--enable-impeller=false` (through `AppArgs.engine_args`) keeps Skia on the
@@ -230,7 +274,7 @@ To contribute to flutter-rs, please see [CONTRIBUTING](CONTRIBUTING.md).
 
 MIT — see [LICENSE](LICENSE).
 
-[flutter-badge]: https://img.shields.io/badge/flutter-v3.44%20--%20v3.50-blueviolet.svg
+[flutter-badge]: https://img.shields.io/badge/flutter-v3.50%20--%20v3.51-blueviolet.svg
 [flutter-url]: https://flutter.dev/
 [crates-badge]: https://img.shields.io/crates/v/flutter-engine.svg
 [crates-url]: https://crates.io/crates/flutter-engine

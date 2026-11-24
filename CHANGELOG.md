@@ -6,7 +6,8 @@ five crates. Dates are the dates of the corresponding git tags.
 ## 0.5.0 — unreleased
 
 The first work on this project in six years. It ports the embedder to the
-modern Flutter engine API (developed against **Flutter 3.44 – 3.50.x**), moves
+modern Flutter engine API (developed against **Flutter 3.50 – 3.51.x**:
+3.50.0 stable and 3.51.0-1.0.pre), moves
 the workspace to edition 2024, removes essentially every panic from the FFI
 boundary, fixes two memory-safety bugs in the standard codec, and replaces the
 dead `cargo-flutter` workflow with plain `cargo`.
@@ -17,6 +18,14 @@ This is a hard break with 0.3.5: no 0.3.x code compiles unchanged. `flutter-rs`
 
 Highlights:
 
+- **Multi-window on the official embedder API.** One engine drives many views
+  through `FlutterEngineAddView`/`FlutterEngineRemoveView`, per-view
+  metrics/pointer/focus events and a `FlutterCompositor` `present_view`
+  callback — the same C API the GTK, Windows and macOS C++ embedders use. The
+  framework's Dart windowing API and Flutter's `examples/multiple_windows` run
+  unmodified, without SDK patches or private channels. Verified on Linux
+  (X11/XWayland) and macOS (Metal + Impeller, Skia, software), and exercised on
+  Windows 11. Requires Flutter 3.50+.
 - **Nothing in the engine callbacks aborts the process any more.** Every
   `extern "C"` entry point that can reach user code is panic-guarded, the
   decode / respond / argument paths return errors instead of unwrapping, and

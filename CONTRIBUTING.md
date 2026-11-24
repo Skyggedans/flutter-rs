@@ -118,8 +118,9 @@ framework, but the runtime path is unverified.
 
 `examples/multiple_windows` is a standalone Flutter project plus a standalone
 Rust runner (its own `[workspace]`), so it is not built by the workspace gate.
-Run it with `examples/multiple_windows/run.sh`; it needs Flutter 3.50 and the
-generic embedder for the SDK's engine revision.
+Run it with `examples/multiple_windows/run.sh`; it needs Flutter 3.50+ (3.50.0
+stable and 3.51.0-1.0.pre are tested) and the generic embedder for the SDK's
+engine revision.
 
 A Windows-gnu cross-check is
 `cargo check --workspace --target x86_64-pc-windows-gnu --no-default-features`

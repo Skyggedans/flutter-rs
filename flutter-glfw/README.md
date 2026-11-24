@@ -10,6 +10,15 @@ It is the only maintained backend in the workspace. The Dart half of the
 framework's windowing API is in [`dart/`](dart) (`flutter_glfw_windowing`), and
 `../examples/multiple_windows` runs Flutter's official reference app on it.
 
+The backend implements the embedder's official multi-view C API — the same one
+the GTK, Windows and macOS C++ embedders use: `FlutterEngineAddView`/
+`FlutterEngineRemoveView`, per-view metrics/pointer/focus events and a
+`FlutterCompositor` with `create_backing_store`/`collect_backing_store`/
+`present_view`. The framework's Dart windowing API runs on it unmodified, with
+no Flutter SDK patches. Renderers: OpenGL on Linux/Windows, Metal on macOS
+(Impeller by default, Skia with `--enable-impeller=false`) and a software
+fallback.
+
 ```toml
 [dependencies]
 flutter-glfw = "0.5"
@@ -54,6 +63,8 @@ platform channel and without exported C symbols. See
   `cfg_select!`).
 - An engine library on the link and loader paths — see the
   [workspace README](../README.md#flutter-engine-library).
+- Flutter 3.50 or newer for the Dart windowing package and
+  `examples/multiple_windows` (3.50.0 stable and 3.51.0-1.0.pre are tested).
 - GLFW's own build dependencies. `glfw-sys` links a system GLFW ≥ 3.4 when
   `pkg-config` finds one and otherwise builds the vendored sources with CMake,
   which on Linux needs the X11 and Wayland development packages listed in

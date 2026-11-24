@@ -3,7 +3,12 @@
 Flutter's official `examples/multiple_windows` reference app, copied from the
 Flutter 3.50 SDK, plus a flutter-rs runner.
 
-The Dart UI (`lib/app/`, `lib/main.dart`) is unchanged. The only additions are:
+The Dart UI (`lib/app/`, `lib/main.dart`) is unchanged. The backend implements
+the official embedder C API (`FlutterEngineAddView`/`RemoveView`, per-view
+metrics/pointer/focus events, `FlutterCompositor`), so the framework's own
+windowing layer drives it without SDK patches or private channels.
+
+The only additions are:
 
 - `lib/main_glfw.dart` — the entrypoint. It enables the framework's
   experimental windowing flag at runtime and installs `GlfwWindowingOwner`
@@ -13,7 +18,8 @@ The Dart UI (`lib/app/`, `lib/main.dart`) is unchanged. The only additions are:
 - `run.sh` — builds the Dart bundle, fetches the matching generic embedder if
   needed, builds the runner and starts it.
 - `run_macos.sh` — the same for macOS, where the engine's artifact is a
-  `FlutterEmbedder.framework` and the app must use the software renderer.
+  universal `FlutterEmbedder.framework`; Metal + Impeller is the default, with
+  Skia and software fallbacks.
 
 ## Running
 
@@ -38,8 +44,9 @@ script downloads the universal `FlutterEmbedder.framework` into `.engine/` when
 `DYLD_FRAMEWORK_PATH` set (the rpath emitted by `flutter-engine-sys` only covers
 that crate's own targets).
 
-Requirements: Flutter 3.50 on `PATH` (or `FLUTTER_ROOT` set), Rust, and the
-system packages listed in the workspace's `CONTRIBUTING.md`. On a Wayland
+Requirements: Flutter 3.50+ on `PATH` (or `FLUTTER_ROOT` set; 3.50.0 stable
+and 3.51.0-1.0.pre are tested), Rust, and the system packages listed in the
+workspace's `CONTRIBUTING.md`. On a Wayland
 session, use XWayland for the full demo so tooltips, popups and satellites can
 be positioned:
 
